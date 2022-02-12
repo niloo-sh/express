@@ -1,3 +1,5 @@
 .venv
 venv/
 venv.bak/
+.idea/**/workspace.xml
+.idea/workspace.xml
