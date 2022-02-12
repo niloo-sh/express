@@ -1,5 +1,5 @@
-.venv
-venv/
-venv.bak/
-.idea/**/workspace.xml
-.idea/workspace.xml
+question2/.venv
+question2/venv/
+question2/venv.bak/
+question2/.idea/**/workspace.xml
+question2/.idea/workspace.xml
