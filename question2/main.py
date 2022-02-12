@@ -1,6 +1,10 @@
 import os
+from datetime import datetime
+
 import click
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import regexp_replace, col, udf
+from pyspark.sql.types import DateType
 
 
 def init_spark_connection(appname, sparkmaster, minio_url,
@@ -22,6 +26,7 @@ def init_spark_connection(appname, sparkmaster, minio_url,
         .builder \
         .appName(appname) \
         .master(sparkmaster) \
+        .config("spark.jars.packages",'org.apache.hadoop:hadoop-aws:3.1.2,com.amazonaws:aws-java-sdk:1.11.534')\
         .getOrCreate()
 
     hadoop_conf = sc._jsc.hadoopConfiguration()
@@ -58,9 +63,29 @@ def extract(sc, bucket_name, raw_data_path,section):
 
     return df
 
+
+date_converter = udf(lambda z: datetime.strptime(z,'%a %b %d %H:%M:%S %z %Y'),DateType())
+
+
 def user_df_transform(df):
 
-    return df
+    users = df\
+        .select("message.*", "timestamp")\
+        .select("id", "id_str", "name", "screen_name", "location", "description", "url", "protected", "followers_count",
+                "friends_count","listed_count", "created_at", "favourites_count", "statuses_count", "lang",
+                "profile_image_url_https", "timestamp")\
+        .dropDuplicates(["id"])
+
+    users = users\
+        .withColumn('description', regexp_replace(col("description"), " ", ""))\
+        .withColumn('name', regexp_replace(col("name"), " ", ""))\
+        .withColumn('location', regexp_replace(col("location"), " ", ""))\
+        .withColumn('url', regexp_replace(col("url"), " ", ""))\
+        .withColumn("created_at", date_converter(users.created_at))
+
+
+
+    return users
 
 def tweet_df_transform(df):
 
@@ -106,15 +131,15 @@ def load(df, bucket_name, processed_data_path):
 
 @click.command('ETL job')
 @click.option('--appname', '-a', default='ETL Task', help='Spark app name')
-@click.option('--sparkmaster', default='local',
+@click.option('--sparkmaster', default='local[3]',
               help='Spark master node address:port')
-@click.option('--minio_url', default='local',
+@click.option('--minio_url', default='http://localhost:9000',
               help='import a module')
 @click.option('--minio_access_key', default='minio')
 @click.option('--minio_secret_key', default='minio123')
 @click.option('--bucket_name', default='twitterusers')
 @click.option('--raw_data_path', default='')
-@click.option('--processed_data_path', default='xxxx')
+@click.option('--processed_data_path', default='')
 @click.option('--section', default='user')
 
 def main(appname, sparkmaster, minio_url,
