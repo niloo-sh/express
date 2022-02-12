@@ -26,7 +26,7 @@ def init_spark_connection(appname, sparkmaster, minio_url,
         .builder \
         .appName(appname) \
         .master(sparkmaster) \
-        .config("spark.jars.packages",'org.apache.hadoop:hadoop-aws:3.1.2,com.amazonaws:aws-java-sdk:1.11.534')\
+        .config("spark.jars.packages",'org.apache.hadoop:hadoop-aws:3.1.2,com.amazonaws:aws-java-sdk:1.11.534') \
         .getOrCreate()
 
     hadoop_conf = sc._jsc.hadoopConfiguration()
@@ -51,10 +51,10 @@ def extract(sc, bucket_name, raw_data_path,section):
 
     if section == 'user':
         df = sc.read.json("/home/tapsi/niloo/express/ZerOne - Data Engineering Take Home-20220208T153634Z-001/"
-                        "ZerOne - Data Engineering Take Home/Question2/users_data/users*.json")
+                          "ZerOne - Data Engineering Take Home/Question2/users_data/users*.json")
     elif section == "tweet":
         df = sc.read.json("/home/tapsi/niloo/express/ZerOne - Data Engineering Take Home-20220208T153634Z-001/"
-                        "ZerOne - Data Engineering Take Home/Question2/tweets_data/tweets*.json")
+                          "ZerOne - Data Engineering Take Home/Question2/tweets_data/tweets*.json")
     else:
         print("unknown input")
     # return sc.read.csv('s3a://' + os.path.os.path.join(bucket_name,
@@ -64,32 +64,68 @@ def extract(sc, bucket_name, raw_data_path,section):
     return df
 
 
-date_converter = udf(lambda z: datetime.strptime(z,'%a %b %d %H:%M:%S %z %Y'),DateType())
+date_converter = udf(lambda x: datetime.strptime(x, '%a %b %d %H:%M:%S %z %Y'), DateType())
 
 
 def user_df_transform(df):
 
-    users = df\
-        .select("message.*", "timestamp")\
+    users = df \
+        .select("message.*", "timestamp") \
         .select("id", "id_str", "name", "screen_name", "location", "description", "url", "protected", "followers_count",
                 "friends_count","listed_count", "created_at", "favourites_count", "statuses_count", "lang",
-                "profile_image_url_https", "timestamp")\
+                "profile_image_url_https", "timestamp") \
         .dropDuplicates(["id"])
 
-    users = users\
-        .withColumn('description', regexp_replace(col("description"), " ", ""))\
-        .withColumn('name', regexp_replace(col("name"), " ", ""))\
-        .withColumn('location', regexp_replace(col("location"), " ", ""))\
-        .withColumn('url', regexp_replace(col("url"), " ", ""))\
-        .withColumn("created_at", date_converter(users.created_at))
+    users = users \
+        .withColumn('description', regexp_replace(col("description"), " ", "")) \
+        .withColumn('name', regexp_replace(col("name"), " ", "")) \
+        .withColumn('location', regexp_replace(col("location"), " ", "")) \
+        .withColumn('url', regexp_replace(col("url"), " ", ""))
 
+    processed_df = users.withColumn("created_at", date_converter(users.created_at))
 
+    return processed_df
 
-    return users
 
 def tweet_df_transform(df):
+    tweets = df.select("message.*")
 
-    return df
+    origin_tweets = tweets \
+        .filter((tweets["retweeted_status"].isNull()) & (tweets["quoted_status"].isNull())) \
+        .drop("retweeted_status", "retweeted_status")
+
+    retweeted = tweets \
+        .filter(tweets["retweeted_status"].isNotNull()) \
+        .select("retweeted_status.*")
+    final_retweeted = retweeted.drop("quoted_status")
+
+    retweeted_quot = retweeted \
+        .filter(retweeted["quoted_status"].isNotNull()) \
+        .select("quoted_status.*")
+
+    quoted = tweets \
+        .filter(tweets["quoted_status"].isNotNull()) \
+        .select("quoted_status.*")
+
+    total_quote = retweeted_quot \
+        .union(quoted) \
+
+    common_columns = list(set(final_retweeted.columns).intersection(set(origin_tweets.columns))
+                                  .intersection(set(total_quote.columns)))
+    quote = total_quote.select(*common_columns).drop("user", "entities", "place")
+    retweet = final_retweeted.select(*common_columns).drop("user", "entities", "place")
+    tweet = origin_tweets.select(*common_columns).drop("user", "entities", "place")
+
+    union_tweets = quote \
+        .union(retweet) \
+        .union(tweet)
+    result = union_tweets \
+        .dropDuplicates(["id"]) \
+        .withColumn('text', regexp_replace(col("text"), " ", "")) \
+        .withColumn("created_at", date_converter(union_tweets.created_at))
+
+    return result
+
 
 def transform(df, section):
     """ Transform dataframe to an acceptable form.
