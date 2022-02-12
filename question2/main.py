@@ -56,6 +56,7 @@ def extract(sc, bucket_name, raw_data_path,section):
         df = sc.read.json("/home/niloo/express/ZerOne - Data Engineering Take Home-20220208T153634Z-001/"
                           "ZerOne - Data Engineering Take Home/Question2/tweets_data/tweets*.json")
     else:
+        print("unknown input")
 
     return df
 
