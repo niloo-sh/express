@@ -50,16 +50,12 @@ def extract(sc, bucket_name, raw_data_path,section):
     """
 
     if section == 'user':
-        df = sc.read.json("/home/tapsi/niloo/express/ZerOne - Data Engineering Take Home-20220208T153634Z-001/"
+        df = sc.read.json("/home/niloo/express/ZerOne - Data Engineering Take Home-20220208T153634Z-001/"
                           "ZerOne - Data Engineering Take Home/Question2/users_data/users*.json")
     elif section == "tweet":
-        df = sc.read.json("/home/tapsi/niloo/express/ZerOne - Data Engineering Take Home-20220208T153634Z-001/"
+        df = sc.read.json("/home/niloo/express/ZerOne - Data Engineering Take Home-20220208T153634Z-001/"
                           "ZerOne - Data Engineering Take Home/Question2/tweets_data/tweets*.json")
     else:
-        print("unknown input")
-    # return sc.read.csv('s3a://' + os.path.os.path.join(bucket_name,
-    #                                                    raw_data_path),
-    #                    header=True)
 
     return df
 
@@ -144,7 +140,7 @@ def transform(df, section):
     else:
         print("unknown input")
 
-    return df
+    return processed_df
 
 
 def load(df, bucket_name, processed_data_path):
@@ -160,9 +156,7 @@ def load(df, bucket_name, processed_data_path):
          Nothing!
     """
     # todo: change this function if
-    df.write.csv('s3a://' + os.path.os.path.join(bucket_name,
-                                                 processed_data_path),
-                 header=True)
+    df.write.option("header",True).partitionBy("created_at").json("/home/tapsi/niloo/express/datacsv")
 
 
 @click.command('ETL job')
