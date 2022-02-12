@@ -32,7 +32,7 @@ def init_spark_connection(appname, sparkmaster, minio_url,
     return sc
 
 
-def extract(sc, bucket_name, raw_data_path):
+def extract(sc, bucket_name, raw_data_path,section):
     """ Extract csv files from Minio.
 
     Args:
@@ -44,12 +44,29 @@ def extract(sc, bucket_name, raw_data_path):
         df: raw dataframe.
     """
 
-    return sc.read.csv('s3a://' + os.path.os.path.join(bucket_name,
-                                                       raw_data_path),
-                       header=True)
+    if section == 'user':
+        df = sc.read.json("/home/tapsi/niloo/express/ZerOne - Data Engineering Take Home-20220208T153634Z-001/"
+                        "ZerOne - Data Engineering Take Home/Question2/users_data/users*.json")
+    elif section == "tweet":
+        df = sc.read.json("/home/tapsi/niloo/express/ZerOne - Data Engineering Take Home-20220208T153634Z-001/"
+                        "ZerOne - Data Engineering Take Home/Question2/tweets_data/tweets*.json")
+    else:
+        print("unknown input")
+    # return sc.read.csv('s3a://' + os.path.os.path.join(bucket_name,
+    #                                                    raw_data_path),
+    #                    header=True)
 
+    return df
 
-def transform(df):
+def user_df_transform(df):
+
+    return df
+
+def tweet_df_transform(df):
+
+    return df
+
+def transform(df, section):
     """ Transform dataframe to an acceptable form.
 
     Args:
@@ -59,6 +76,13 @@ def transform(df):
         df: processed dataframe
     """
     # todo: write the your code here
+    if section == 'user':
+        processed_df = user_df_transform(df)
+    elif section == 'tweet':
+        processed_df = tweet_df_transform(df)
+    else:
+        print("unknown input")
+
     return df
 
 
@@ -95,16 +119,16 @@ def load(df, bucket_name, processed_data_path):
 
 def main(appname, sparkmaster, minio_url,
          minio_access_key, minio_secret_key,
-         bucket_name, raw_data_path, processed_data_path):
+         bucket_name, raw_data_path, processed_data_path, section):
 
     sc = init_spark_connection(appname, sparkmaster, minio_url,
                                minio_access_key, minio_secret_key)
 
     # extract data from MINIO
-    df = extract(sc, bucket_name, raw_data_path)
+    df = extract(sc, bucket_name, raw_data_path, section)
 
     # transform data to desired form
-    clean_df = transform(df)
+    clean_df = transform(df, section)
 
     # load clean data to MINIO
     load(clean_df, bucket_name, processed_data_path)
